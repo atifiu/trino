@@ -1608,7 +1608,8 @@ public class DeltaLakeMetadata
                             dataChange,
                             Optional.of(serializeStatsAsJson(statisticsWithExactNames)),
                             Optional.empty(),
-                            ImmutableMap.of()));
+                            ImmutableMap.of(),
+                            Optional.empty()));
         }
     }
 

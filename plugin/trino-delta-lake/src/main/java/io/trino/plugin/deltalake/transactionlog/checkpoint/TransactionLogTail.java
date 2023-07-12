@@ -14,6 +14,7 @@
 package io.trino.plugin.deltalake.transactionlog.checkpoint;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import io.trino.filesystem.Location;
 import io.trino.filesystem.TrinoFileSystem;
 import io.trino.filesystem.TrinoInputFile;
@@ -24,9 +25,12 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.trino.plugin.deltalake.transactionlog.TransactionLogParser.parseJson;
 import static io.trino.plugin.deltalake.transactionlog.TransactionLogUtil.getTransactionLogDir;
 import static io.trino.plugin.deltalake.transactionlog.TransactionLogUtil.getTransactionLogJsonEntryPath;
@@ -37,12 +41,12 @@ public class TransactionLogTail
 {
     private static final int JSON_LOG_ENTRY_READ_BUFFER_SIZE = 1024 * 1024;
 
-    private final List<DeltaLakeTransactionLogEntry> entries;
+    private final Map<Long, List<DeltaLakeTransactionLogEntry>> entries;
     private final long version;
 
-    private TransactionLogTail(List<DeltaLakeTransactionLogEntry> entries, long version)
+    private TransactionLogTail(Map<Long, List<DeltaLakeTransactionLogEntry>> entries, long version)
     {
-        this.entries = ImmutableList.copyOf(requireNonNull(entries, "entries is null"));
+        this.entries = ImmutableMap.copyOf(requireNonNull(entries, "entries is null"));
         this.version = version;
     }
 
@@ -63,7 +67,7 @@ public class TransactionLogTail
             Optional<Long> endVersion)
             throws IOException
     {
-        ImmutableList.Builder<DeltaLakeTransactionLogEntry> entriesBuilder = ImmutableList.builder();
+        ImmutableMap.Builder<Long, List<DeltaLakeTransactionLogEntry>> entriesBuilder = ImmutableMap.builder();
 
         long version = startVersion.orElse(0L);
         long entryNumber = startVersion.map(start -> start + 1).orElse(0L);
@@ -75,7 +79,7 @@ public class TransactionLogTail
         while (!endOfTail) {
             results = getEntriesFromJson(entryNumber, transactionLogDir, fileSystem);
             if (results.isPresent()) {
-                entriesBuilder.addAll(results.get());
+                entriesBuilder.put(entryNumber, results.get());
                 version = entryNumber;
                 entryNumber++;
             }
@@ -91,13 +95,13 @@ public class TransactionLogTail
             }
         }
 
-        return new TransactionLogTail(entriesBuilder.build(), version);
+        return new TransactionLogTail(entriesBuilder.buildOrThrow(), version);
     }
 
     public Optional<TransactionLogTail> getUpdatedTail(TrinoFileSystem fileSystem, String tableLocation)
             throws IOException
     {
-        ImmutableList.Builder<DeltaLakeTransactionLogEntry> entriesBuilder = ImmutableList.builder();
+        ImmutableMap.Builder<Long, List<DeltaLakeTransactionLogEntry>> entriesBuilder = ImmutableMap.builder();
 
         long newVersion = version;
 
@@ -108,9 +112,9 @@ public class TransactionLogTail
             if (results.isPresent()) {
                 if (version == newVersion) {
                     // initialize entriesBuilder with entries we have already read
-                    entriesBuilder.addAll(entries);
+                    entriesBuilder.putAll(entries);
                 }
-                entriesBuilder.addAll(results.get());
+                entriesBuilder.put(newVersion + 1, results.get());
                 newVersion++;
             }
             else {
@@ -121,7 +125,7 @@ public class TransactionLogTail
         if (newVersion == version) {
             return Optional.empty();
         }
-        return Optional.of(new TransactionLogTail(entriesBuilder.build(), newVersion));
+        return Optional.of(new TransactionLogTail(entriesBuilder.buildOrThrow(), newVersion));
     }
 
     public static Optional<List<DeltaLakeTransactionLogEntry>> getEntriesFromJson(long entryNumber, String transactionLogDir, TrinoFileSystem fileSystem)
@@ -152,6 +156,14 @@ public class TransactionLogTail
     }
 
     public List<DeltaLakeTransactionLogEntry> getFileEntries()
+    {
+        return entries.values().stream().flatMap(Collection::stream).collect(toImmutableList());
+    }
+
+    /**
+     * @return transaction log entries with version keys
+     */
+    public Map<Long, List<DeltaLakeTransactionLogEntry>> getVersionAndFileEntries()
     {
         return entries;
     }
