@@ -69,7 +69,7 @@ public class TestDeltaLakeTableWithCustomLocationUsingGlueMetastore
         try {
             if (metastore != null) {
                 // Data is on the local disk and will be deleted by the deleteOnExit hook
-                metastore.dropDatabase(SCHEMA, false);
+                metastore.dropDatabase(SCHEMA, false, false);
                 deleteRecursively(metastoreDir.toPath(), ALLOW_INSECURE);
             }
         }

@@ -469,11 +469,11 @@ public class SemiTransactionalHiveMetastore
         return databaseQueryId.isPresent() && databaseQueryId.get().equals(queryId);
     }
 
-    public synchronized void dropDatabase(ConnectorSession session, String schemaName)
+    public synchronized void dropDatabase(ConnectorSession session, String schemaName, boolean cascade)
     {
         setExclusive((delegate, hdfsEnvironment) -> {
             boolean deleteData = shouldDeleteDatabaseData(session, schemaName);
-            delegate.dropDatabase(schemaName, deleteData);
+            delegate.dropDatabase(schemaName, deleteData, cascade);
         });
     }
 

@@ -244,7 +244,7 @@ public class TrinoHiveCatalog
             }
         }).orElse(deleteSchemaLocationsFallback);
 
-        metastore.dropDatabase(namespace, deleteData);
+        metastore.dropDatabase(namespace, deleteData, false);
     }
 
     @Override

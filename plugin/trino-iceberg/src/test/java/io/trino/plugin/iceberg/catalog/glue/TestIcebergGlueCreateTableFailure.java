@@ -127,7 +127,7 @@ public class TestIcebergGlueCreateTableFailure
     {
         try {
             if (glueHiveMetastore != null) {
-                glueHiveMetastore.dropDatabase(schemaName, false);
+                glueHiveMetastore.dropDatabase(schemaName, false, false);
             }
             if (dataDirectory != null) {
                 deleteRecursively(dataDirectory, ALLOW_INSECURE);

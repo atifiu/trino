@@ -159,7 +159,7 @@ public class TestDeltaLakeGlueMetastore
             throws Exception
     {
         closeAll(
-                () -> metastoreClient.dropDatabase(databaseName, true),
+                () -> metastoreClient.dropDatabase(databaseName, true, false),
                 () -> lifeCycleManager.stop(),
                 () -> {
                     if (tempDir.exists()) {

@@ -104,7 +104,7 @@ public class HiveMetastoreBackedDeltaLakeMetastore
     @Override
     public void dropDatabase(String databaseName, boolean deleteData)
     {
-        delegate.dropDatabase(databaseName, deleteData);
+        delegate.dropDatabase(databaseName, deleteData, false);
     }
 
     @Override

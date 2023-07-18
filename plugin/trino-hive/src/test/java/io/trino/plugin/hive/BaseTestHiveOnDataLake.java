@@ -2095,6 +2095,69 @@ public abstract class BaseTestHiveOnDataLake
         assertUpdate("DROP TABLE " + getFullyQualifiedTestTableName(tableName));
     }
 
+    /**
+     * see {@link #testHiveDropSchemaCascade} about Hive behavior
+     */
+    @Test
+    public void testTrinoDropSchemaCascade()
+    {
+        String schemaName = "test_drop_schema_cascade_" + randomNameSuffix();
+        String tableName = "test_table" + randomNameSuffix();
+        String externalTableName = "test_external_table" + randomNameSuffix();
+        String trinoViewName = "test_trino_view" + randomNameSuffix();
+        String hiveViewName = "test_hive_view" + randomNameSuffix();
+        try {
+            assertUpdate("CREATE SCHEMA hive.%2$s WITH (location='s3a://%1$s/%2$s')".formatted(bucketName, schemaName));
+            assertUpdate("CREATE TABLE " + schemaName + "." + tableName + " AS SELECT 1 a", 1);
+            assertUpdate("CREATE TABLE " + schemaName + "." + externalTableName + "(a INT)" +
+                    "WITH (external_location = '" + getTableLocation(schemaName + "." + tableName) + "')");
+            assertUpdate("CREATE VIEW " + schemaName + "." + trinoViewName + " AS SELECT 1 a");
+            hiveMinioDataLake.getHiveHadoop().runOnHive("CREATE VIEW " + schemaName + "." + hiveViewName + " AS SELECT * FROM " + schemaName + "." + tableName);
+
+            assertThat(computeActual("SHOW SCHEMAS").getOnlyColumnAsSet()).contains(schemaName);
+            assertThat(metastoreClient.getDatabase(schemaName)).isNotEmpty();
+            assertThat(metastoreClient.getAllTables(schemaName)).isNotEmpty();
+            assertThat(hiveMinioDataLake.getMinioClient().listObjects(bucketName, schemaName)).isNotEmpty();
+
+            assertUpdate("DROP SCHEMA " + schemaName + " CASCADE");
+
+            assertThat(computeActual("SHOW SCHEMAS").getOnlyColumnAsSet()).doesNotContain(schemaName);
+            assertThat(metastoreClient.getDatabase(schemaName)).isEmpty();
+            assertThat(metastoreClient.getAllTables(schemaName)).isEmpty();
+            assertThat(hiveMinioDataLake.getMinioClient().listObjects(bucketName, schemaName).stream()).isEmpty();
+        }
+        finally {
+            assertUpdate("DROP TABLE IF EXISTS " + schemaName + "." + tableName);
+            assertUpdate("DROP VIEW IF EXISTS " + schemaName + "." + trinoViewName);
+            hiveMinioDataLake.getHiveHadoop().runOnHive("DROP VIEW IF EXISTS " + schemaName + "." + hiveViewName);
+            assertUpdate("DROP SCHEMA IF EXISTS " + schemaName);
+        }
+    }
+
+    @Test
+    public void testHiveDropSchemaCascade()
+    {
+        // Verify Hive implementation
+        String schemaName = "test_drop_schema_cascade_" + randomNameSuffix();
+        String externalTableName = "test_external_table" + randomNameSuffix();
+        String schemaLocation = "s3a://%s/%s".formatted(bucketName, schemaName);
+        try {
+            assertUpdate("CREATE SCHEMA hive.%s WITH (location='%s')".formatted(schemaName, schemaLocation));
+            hiveMinioDataLake.getHiveHadoop().runOnHive("CREATE EXTERNAL TABLE default.%s(a int) LOCATION '%s/%s'".formatted(externalTableName, schemaLocation, externalTableName));
+            hiveMinioDataLake.getHiveHadoop().runOnHive("INSERT INTO default.%s VALUES (1)".formatted(externalTableName));
+            assertThat(hiveMinioDataLake.getMinioClient().listObjects(bucketName, schemaName)).isNotEmpty();
+
+            // DROP DATABASE with CASCADE on Hive removes the directory even if it contains files of external table on other databases
+            hiveMinioDataLake.getHiveHadoop().runOnHive("DROP DATABASE " + schemaName + " CASCADE");
+            assertThat(metastoreClient.getTable("default", externalTableName)).isNotEmpty();
+            assertThat(hiveMinioDataLake.getMinioClient().listObjects(bucketName, schemaName)).isEmpty();
+        }
+        finally {
+            hiveMinioDataLake.getHiveHadoop().runOnHive("DROP TABLE IF EXISTS default." + externalTableName);
+            assertUpdate("DROP SCHEMA IF EXISTS " + schemaName);
+        }
+    }
+
     private void renamePartitionResourcesOutsideTrino(String tableName, String partitionColumn, String regionKey)
     {
         String partitionName = format("%s=%s", partitionColumn, regionKey);

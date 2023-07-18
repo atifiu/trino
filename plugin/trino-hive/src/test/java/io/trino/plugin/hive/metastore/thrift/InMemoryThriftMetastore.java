@@ -129,12 +129,12 @@ public class InMemoryThriftMetastore
 
     // TODO: respect deleteData
     @Override
-    public synchronized void dropDatabase(String databaseName, boolean deleteData)
+    public synchronized void dropDatabase(String databaseName, boolean deleteData, boolean cascade)
     {
         if (!databases.containsKey(databaseName)) {
             throw new SchemaNotFoundException(databaseName);
         }
-        if (!getAllTables(databaseName).isEmpty()) {
+        if (!cascade && !getAllTables(databaseName).isEmpty()) {
             throw new TrinoException(SCHEMA_NOT_EMPTY, "Schema not empty: " + databaseName);
         }
         databases.remove(databaseName);

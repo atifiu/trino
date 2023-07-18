@@ -49,7 +49,7 @@ public interface ThriftMetastore
 {
     void createDatabase(Database database);
 
-    void dropDatabase(String databaseName, boolean deleteData);
+    void dropDatabase(String databaseName, boolean deleteData, boolean cascade);
 
     void alterDatabase(String databaseName, Database database);
 

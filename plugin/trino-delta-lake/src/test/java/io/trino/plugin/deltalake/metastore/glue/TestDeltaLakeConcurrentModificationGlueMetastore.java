@@ -123,7 +123,7 @@ public class TestDeltaLakeConcurrentModificationGlueMetastore
             throws IOException
     {
         if (metastore != null) {
-            metastore.dropDatabase(SCHEMA, false);
+            metastore.dropDatabase(SCHEMA, false, false);
             deleteRecursively(dataDirectory, ALLOW_INSECURE);
         }
     }

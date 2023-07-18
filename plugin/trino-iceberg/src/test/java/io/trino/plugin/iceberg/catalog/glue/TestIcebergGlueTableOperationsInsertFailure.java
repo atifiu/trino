@@ -113,7 +113,7 @@ public class TestIcebergGlueTableOperationsInsertFailure
         try {
             if (glueHiveMetastore != null) {
                 // Data is on the local disk and will be deleted by the deleteOnExit hook
-                glueHiveMetastore.dropDatabase(schemaName, false);
+                glueHiveMetastore.dropDatabase(schemaName, false, false);
             }
         }
         catch (Exception e) {

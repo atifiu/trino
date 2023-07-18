@@ -142,7 +142,7 @@ public class CountingAccessHiveMetastore
     }
 
     @Override
-    public void dropDatabase(String databaseName, boolean deleteData)
+    public void dropDatabase(String databaseName, boolean deleteData, boolean cascade)
     {
         throw new UnsupportedOperationException();
     }

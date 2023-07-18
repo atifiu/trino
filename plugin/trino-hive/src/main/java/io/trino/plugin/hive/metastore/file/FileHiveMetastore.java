@@ -198,7 +198,7 @@ public class FileHiveMetastore
     }
 
     @Override
-    public synchronized void dropDatabase(String databaseName, boolean deleteData)
+    public synchronized void dropDatabase(String databaseName, boolean deleteData, boolean cascade)
     {
         requireNonNull(databaseName, "databaseName is null");
 
@@ -206,8 +206,14 @@ public class FileHiveMetastore
         databaseName = databaseName.toLowerCase(ENGLISH);
 
         getRequiredDatabase(databaseName);
-        if (!getAllTables(databaseName).isEmpty()) {
-            throw new TrinoException(HIVE_METASTORE_ERROR, "Database " + databaseName + " is not empty");
+        List<String> tables = getAllTables(databaseName);
+        if (!tables.isEmpty()) {
+            if (!cascade) {
+                throw new TrinoException(HIVE_METASTORE_ERROR, "Database " + databaseName + " is not empty");
+            }
+            for (String tableName : tables) {
+                dropTable(databaseName, tableName, deleteData);
+            }
         }
 
         // Either delete the entire database directory or just its metadata files

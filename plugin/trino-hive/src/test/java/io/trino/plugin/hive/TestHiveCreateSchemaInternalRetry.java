@@ -81,8 +81,8 @@ public class TestHiveCreateSchemaInternalRetry
             throws IOException
     {
         if (metastore != null) {
-            metastore.dropDatabase(TEST_SCHEMA_TIMEOUT, false);
-            metastore.dropDatabase(TEST_SCHEMA_DIFFERENT_SESSION, false);
+            metastore.dropDatabase(TEST_SCHEMA_TIMEOUT, false, false);
+            metastore.dropDatabase(TEST_SCHEMA_DIFFERENT_SESSION, false, false);
         }
     }
 

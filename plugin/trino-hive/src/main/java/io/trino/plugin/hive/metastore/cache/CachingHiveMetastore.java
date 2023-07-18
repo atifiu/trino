@@ -798,10 +798,10 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void dropDatabase(String databaseName, boolean deleteData)
+    public void dropDatabase(String databaseName, boolean deleteData, boolean cascade)
     {
         try {
-            delegate.dropDatabase(databaseName, deleteData);
+            delegate.dropDatabase(databaseName, deleteData, cascade);
         }
         finally {
             invalidateDatabase(databaseName);

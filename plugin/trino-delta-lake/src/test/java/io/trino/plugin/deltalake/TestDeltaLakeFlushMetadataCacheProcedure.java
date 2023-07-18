@@ -92,7 +92,7 @@ public class TestDeltaLakeFlushMetadataCacheProcedure
 
         // Drop a table and a schema outside Trino
         metastore.dropTable("cached", "renamed", false);
-        metastore.dropDatabase("cached", false);
+        metastore.dropDatabase("cached", false, false);
 
         // Should still return old schemas from cache
         assertQuery(showSchemasSql, "VALUES ('cached'), ('information_schema'), ('default')");

@@ -28,6 +28,7 @@ import static io.trino.plugin.deltalake.DeltaLakeQueryRunner.DELTA_CATALOG;
 import static io.trino.plugin.hive.metastore.glue.GlueHiveMetastore.createTestingGlueHiveMetastore;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class TestDeltaS3AndGlueMetastoreTest
         extends BaseS3AndGlueMetastoreTest
@@ -52,6 +53,13 @@ public class TestDeltaS3AndGlueMetastoreTest
                 .build();
         queryRunner.execute("CREATE SCHEMA " + schemaName + " WITH (location = '" + schemaPath() + "')");
         return queryRunner;
+    }
+
+    @Override
+    public void testDropSchemaCascade()
+    {
+        assertThatThrownBy(super::testDropSchemaCascade)
+                .hasMessageContaining("This connector does not support dropping schemas with CASCADE option");
     }
 
     @Override

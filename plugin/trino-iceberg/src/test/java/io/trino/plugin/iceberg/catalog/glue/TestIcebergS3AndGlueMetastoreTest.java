@@ -176,4 +176,11 @@ public class TestIcebergS3AndGlueMetastoreTest
                     .hasMessageContaining("location contains a fragment");
         }
     }
+
+    @Override
+    public void testDropSchemaCascade()
+    {
+        assertThatThrownBy(super::testDropSchemaCascade)
+                .hasMessageContaining("This connector does not support dropping schemas with CASCADE option");
+    }
 }

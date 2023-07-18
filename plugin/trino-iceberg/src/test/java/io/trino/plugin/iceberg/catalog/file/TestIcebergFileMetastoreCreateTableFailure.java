@@ -91,7 +91,7 @@ public class TestIcebergFileMetastoreCreateTableFailure
             throws Exception
     {
         if (metastore != null) {
-            metastore.dropDatabase(SCHEMA_NAME, true);
+            metastore.dropDatabase(SCHEMA_NAME, true, false);
         }
         if (dataDirectory != null) {
             deleteRecursively(dataDirectory, ALLOW_INSECURE);

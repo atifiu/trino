@@ -108,7 +108,7 @@ public class TestSharedGlueMetastore
         try {
             if (glueMetastore != null) {
                 // Data is on the local disk and will be deleted by the deleteOnExit hook
-                glueMetastore.dropDatabase(schema, false);
+                glueMetastore.dropDatabase(schema, false, false);
             }
         }
         catch (Exception e) {

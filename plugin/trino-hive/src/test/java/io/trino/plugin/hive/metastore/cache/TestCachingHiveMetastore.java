@@ -1173,7 +1173,7 @@ public class TestCachingHiveMetastore
         assertThat(metastore.getAllDatabases()).containsExactly(TEST_DATABASE);
         assertThat(mockClient.getAccessCount()).isEqualTo(1); // should read it from cache
 
-        metastore.dropDatabase(TEST_DATABASE, false);
+        metastore.dropDatabase(TEST_DATABASE, false, false);
 
         assertThat(metastore.getAllDatabases()).containsExactly(TEST_DATABASE);
         assertThat(mockClient.getAccessCount()).isEqualTo(2);

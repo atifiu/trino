@@ -167,9 +167,9 @@ public class HiveMetastoreClosure
         delegate.createDatabase(database);
     }
 
-    public void dropDatabase(String databaseName, boolean deleteData)
+    public void dropDatabase(String databaseName, boolean deleteData, boolean cascade)
     {
-        delegate.dropDatabase(databaseName, deleteData);
+        delegate.dropDatabase(databaseName, deleteData, cascade);
     }
 
     public void renameDatabase(String databaseName, String newDatabaseName)

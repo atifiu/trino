@@ -74,7 +74,7 @@ public abstract class BaseS3AndGlueMetastoreTest
     public void tearDown()
     {
         if (metastore != null) {
-            metastore.dropDatabase(schemaName, true);
+            metastore.dropDatabase(schemaName, true, false);
             metastore = null;
         }
         if (s3 != null) {
@@ -225,6 +225,37 @@ public abstract class BaseS3AndGlueMetastoreTest
 
             Set<String> updatedFiles = getActiveFiles(tableName);
             validateFilesAfterOptimize(getTableLocation(tableName), initialFiles, updatedFiles);
+        }
+    }
+
+    @Test
+    public void testDropSchemaCascade()
+    {
+        String schemaName = "test_drop_schema_cascade_" + randomNameSuffix();
+        String tableName = "test_table" + randomNameSuffix();
+        String trinoViewName = "test_view" + randomNameSuffix();
+        try {
+            assertUpdate("CREATE SCHEMA %2$s WITH (location='s3a://%1$s/%2$s')".formatted(bucketName, schemaName));
+            assertUpdate("CREATE TABLE " + schemaName + "." + tableName + " AS SELECT 1 a", 1);
+            assertUpdate("CREATE VIEW " + schemaName + "." + trinoViewName + " AS SELECT 1 a");
+            assertThat(computeActual("SHOW SCHEMAS").getOnlyColumnAsSet()).contains(schemaName);
+            assertThat(metastore.getDatabase(schemaName)).isNotEmpty();
+            assertThat(metastore.getAllTables(schemaName)).isNotEmpty();
+            assertThat(s3.listObjectsV2(new ListObjectsV2Request().withBucketName(bucketName).withPrefix(schemaName)).getObjectSummaries())
+                    .isNotEmpty();
+
+            assertUpdate("DROP SCHEMA " + schemaName + " CASCADE");
+
+            assertThat(computeActual("SHOW SCHEMAS").getOnlyColumnAsSet()).doesNotContain(schemaName);
+            assertThat(metastore.getDatabase(schemaName)).isEmpty();
+            assertThat(metastore.getAllTables(schemaName)).isEmpty();
+            assertThat(s3.listObjectsV2(new ListObjectsV2Request().withBucketName(bucketName).withPrefix(schemaName)).getObjectSummaries())
+                    .isEmpty();
+        }
+        finally {
+            assertUpdate("DROP TABLE IF EXISTS " + schemaName + "." + tableName);
+            assertUpdate("DROP VIEW IF EXISTS " + schemaName + "." + trinoViewName);
+            assertUpdate("DROP SCHEMA IF EXISTS " + schemaName);
         }
     }
 
