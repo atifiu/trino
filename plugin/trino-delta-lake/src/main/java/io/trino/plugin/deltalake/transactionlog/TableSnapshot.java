@@ -32,7 +32,6 @@ import io.trino.spi.type.TypeManager;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -159,9 +158,9 @@ public class TableSnapshot
         return logTail.getFileEntries();
     }
 
-    public Map<Long, List<DeltaLakeTransactionLogEntry>> getJsonTransactionLogVersionAndEntries()
+    public List<Transaction> getTransactions()
     {
-        return logTail.getVersionAndFileEntries();
+        return logTail.getTransactions();
     }
 
     public Stream<DeltaLakeTransactionLogEntry> getCheckpointTransactionLogEntries(

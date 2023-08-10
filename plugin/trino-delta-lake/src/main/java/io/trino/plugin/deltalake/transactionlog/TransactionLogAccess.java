@@ -81,7 +81,6 @@ import static io.trino.plugin.deltalake.transactionlog.checkpoint.CheckpointEntr
 import static io.trino.plugin.deltalake.transactionlog.checkpoint.CheckpointEntryIterator.EntryType.REMOVE;
 import static io.trino.plugin.deltalake.transactionlog.checkpoint.TransactionLogTail.getEntriesFromJson;
 import static java.lang.String.format;
-import static java.util.Map.Entry.comparingByKey;
 import static java.util.Objects.requireNonNull;
 
 public class TransactionLogAccess
@@ -285,7 +284,7 @@ public class TransactionLogAccess
                 .collect(toImmutableList());
     }
 
-    private Stream<AddFileEntry> activeAddEntries(Stream<DeltaLakeTransactionLogEntry> checkpointEntries, Map<Long, List<DeltaLakeTransactionLogEntry>> jsonEntries)
+    private Stream<AddFileEntry> activeAddEntries(Stream<DeltaLakeTransactionLogEntry> checkpointEntries, List<Transaction> transactions)
     {
         Map<String, AddFileEntry> activeJsonEntries = new LinkedHashMap<>();
         HashSet<String> removedFiles = new HashSet<>();
@@ -293,10 +292,10 @@ public class TransactionLogAccess
         // The json entries containing the last few entries in the log need to be applied on top of the parquet snapshot:
         // - Any files which have been removed need to be excluded
         // - Any files with newer add actions need to be updated with the most recent metadata
-        jsonEntries.entrySet().stream().sorted(comparingByKey()).forEachOrdered(deltaLakeTransactionLogEntries -> {
+        transactions.forEach(transaction -> {
             Map<String, AddFileEntry> addFilesInTransaction = new LinkedHashMap<>();
             Set<String> removedFilesInTransaction = new HashSet<>();
-            deltaLakeTransactionLogEntries.getValue().forEach(deltaLakeTransactionLogEntry -> {
+            transaction.transactionEntries().forEach(deltaLakeTransactionLogEntry -> {
                 if (deltaLakeTransactionLogEntry.getAdd() != null) {
                     addFilesInTransaction.put(deltaLakeTransactionLogEntry.getAdd().getPath(), deltaLakeTransactionLogEntry.getAdd());
                 }
@@ -374,19 +373,19 @@ public class TransactionLogAccess
     private <T> Stream<T> getEntries(
             TableSnapshot tableSnapshot,
             Set<CheckpointEntryIterator.EntryType> entryTypes,
-            BiFunction<Stream<DeltaLakeTransactionLogEntry>, Map<Long, List<DeltaLakeTransactionLogEntry>>, Stream<T>> entryMapper,
+            BiFunction<Stream<DeltaLakeTransactionLogEntry>, List<Transaction>, Stream<T>> entryMapper,
             ConnectorSession session,
             TrinoFileSystem fileSystem,
             FileFormatDataSourceStats stats)
     {
         try {
-            Map<Long, List<DeltaLakeTransactionLogEntry>> jsonEntries = tableSnapshot.getJsonTransactionLogVersionAndEntries();
+            List<Transaction> transactions = tableSnapshot.getTransactions();
             Stream<DeltaLakeTransactionLogEntry> checkpointEntries = tableSnapshot.getCheckpointTransactionLogEntries(
                     session, entryTypes, checkpointSchemaManager, typeManager, fileSystem, stats);
 
             return entryMapper.apply(
                     checkpointEntries,
-                    jsonEntries);
+                    transactions);
         }
         catch (IOException e) {
             throw new TrinoException(DELTA_LAKE_INVALID_SCHEMA, "Error reading transaction log for " + tableSnapshot.getTable(), e);
@@ -407,7 +406,7 @@ public class TransactionLogAccess
         return getEntries(
                 tableSnapshot,
                 ImmutableSet.of(entryType),
-                (checkpointStream, jsonStream) -> entryMapper.apply(Stream.concat(checkpointStream, jsonStream.values().stream().flatMap(Collection::stream))),
+                (checkpointStream, jsonStream) -> entryMapper.apply(Stream.concat(checkpointStream, jsonStream.stream().map(Transaction::transactionEntries).flatMap(Collection::stream))),
                 session,
                 fileSystem,
                 stats);
