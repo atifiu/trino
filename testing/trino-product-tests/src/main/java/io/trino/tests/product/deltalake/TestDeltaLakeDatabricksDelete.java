@@ -29,9 +29,11 @@ import static io.trino.tests.product.TestGroups.PROFILE_SPECIFIC_TESTS;
 import static io.trino.tests.product.deltalake.util.DeltaLakeTestUtils.DATABRICKS_COMMUNICATION_FAILURE_ISSUE;
 import static io.trino.tests.product.deltalake.util.DeltaLakeTestUtils.DATABRICKS_COMMUNICATION_FAILURE_MATCH;
 import static io.trino.tests.product.deltalake.util.DeltaLakeTestUtils.dropDeltaTableWithRetry;
+import static io.trino.tests.product.deltalake.util.DeltaLakeTestUtils.getTablePropertiesOnDelta;
 import static io.trino.tests.product.utils.QueryExecutors.onDelta;
 import static io.trino.tests.product.utils.QueryExecutors.onTrino;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 public class TestDeltaLakeDatabricksDelete
         extends BaseTestDeltaLakeS3Storage
@@ -57,6 +59,52 @@ public class TestDeltaLakeDatabricksDelete
         assertThat(onDelta().executeQuery("SELECT * FROM default." + tableName))
                 .containsOnly(row(1, 11), row(2, 12));
         onTrino().executeQuery("DROP TABLE " + tableName);
+    }
+
+    @Test(groups = {DELTA_LAKE_DATABRICKS, DELTA_LAKE_OSS, DELTA_LAKE_EXCLUDE_73, DELTA_LAKE_EXCLUDE_91, DELTA_LAKE_EXCLUDE_104, DELTA_LAKE_EXCLUDE_113, PROFILE_SPECIFIC_TESTS})
+    @Flaky(issue = DATABRICKS_COMMUNICATION_FAILURE_ISSUE, match = DATABRICKS_COMMUNICATION_FAILURE_MATCH)
+    public void testDeleteOnAppendOnlyWriterFeature()
+    {
+        String tableName = "test_delete_on_append_only_feature_" + randomNameSuffix();
+        onDelta().executeQuery("" +
+                "CREATE TABLE default." + tableName +
+                "(a INT, b INT)" +
+                "USING delta " +
+                "LOCATION 's3://" + bucketName + "/databricks-compatibility-test-" + tableName + "'" +
+                "TBLPROPERTIES ('delta.minWriterVersion'='7', 'delta.appendOnly' = true)");
+        try {
+            onDelta().executeQuery("INSERT INTO default." + tableName + " VALUES (1,11), (2, 12)");
+            assertThat(getTablePropertiesOnDelta("default", tableName))
+                    .contains(entry("delta.feature.appendOnly", "supported"))
+                    .contains(entry("delta.appendOnly", "true"));
+
+            assertQueryFailure(() -> onDelta().executeQuery("DELETE FROM default." + tableName + " WHERE a = 1"))
+                    .hasMessageContaining("This table is configured to only allow appends");
+            assertQueryFailure(() -> onTrino().executeQuery("DELETE FROM delta.default." + tableName + " WHERE a = 1"))
+                    .hasMessageContaining("Cannot modify rows from a table with 'delta.appendOnly' set to true");
+
+            assertThat(onDelta().executeQuery("SELECT * FROM default." + tableName))
+                    .containsOnly(row(1, 11), row(2, 12));
+
+            // delta.feature.appendOnly still exists even after unsetting the property
+            onDelta().executeQuery("ALTER TABLE default." + tableName + " UNSET TBLPROPERTIES ('delta.feature.appendOnly')");
+            assertThat(getTablePropertiesOnDelta("default", tableName))
+                    .contains(entry("delta.feature.appendOnly", "supported"))
+                    .contains(entry("delta.appendOnly", "true"));
+
+            // Disable delta.appendOnly property
+            onDelta().executeQuery("ALTER TABLE default." + tableName + " SET TBLPROPERTIES ('delta.appendOnly'=false)");
+            assertThat(getTablePropertiesOnDelta("default", tableName))
+                    .contains(entry("delta.feature.appendOnly", "supported"))
+                    .contains(entry("delta.appendOnly", "false"));
+
+            onDelta().executeQuery("DELETE FROM default." + tableName + " WHERE a = 1");
+            onTrino().executeQuery("DELETE FROM delta.default." + tableName + " WHERE a = 2");
+            assertThat(onTrino().executeQuery("SELECT * FROM delta.default." + tableName)).hasNoRows();
+        }
+        finally {
+            dropDeltaTableWithRetry("default." + tableName);
+        }
     }
 
     // Databricks 12.1 and OSS Delta 2.4.0 added support for deletion vectors

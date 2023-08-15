@@ -44,6 +44,7 @@ import static io.trino.tests.product.deltalake.util.DeltaLakeTestUtils.DATABRICK
 import static io.trino.tests.product.deltalake.util.DeltaLakeTestUtils.DATABRICKS_COMMUNICATION_FAILURE_MATCH;
 import static io.trino.tests.product.deltalake.util.DeltaLakeTestUtils.dropDeltaTableWithRetry;
 import static io.trino.tests.product.deltalake.util.DeltaLakeTestUtils.getDatabricksRuntimeVersion;
+import static io.trino.tests.product.deltalake.util.DeltaLakeTestUtils.skipTestUnlessUnsupportedWriterVersionExists;
 import static io.trino.tests.product.utils.QueryExecutors.onDelta;
 import static io.trino.tests.product.utils.QueryExecutors.onTrino;
 import static java.lang.String.format;
@@ -395,6 +396,8 @@ public class TestDeltaLakeWriteDatabricksCompatibility
     @Flaky(issue = DATABRICKS_COMMUNICATION_FAILURE_ISSUE, match = DATABRICKS_COMMUNICATION_FAILURE_MATCH)
     public void testVacuumUnsupportedWriterVersion()
     {
+        skipTestUnlessUnsupportedWriterVersionExists();
+
         String tableName = "test_vacuum_unsupported_writer_version_" + randomNameSuffix();
         String directoryName = "databricks-compatibility-test-" + tableName;
 
@@ -402,10 +405,33 @@ public class TestDeltaLakeWriteDatabricksCompatibility
                 "(a INT)" +
                 "USING DELTA " +
                 "LOCATION '" + ("s3://" + bucketName + "/" + directoryName) + "'" +
-                "TBLPROPERTIES ('delta.minWriterVersion'='7')");
+                "TBLPROPERTIES ('delta.minWriterVersion'='8')");
+
         try {
             assertThatThrownBy(() -> onTrino().executeQuery("CALL delta.system.vacuum('default', '" + tableName + "', '7d')"))
-                    .hasMessageContaining("Cannot execute vacuum procedure with 7 writer version");
+                    .hasMessageContaining("Cannot execute vacuum procedure with 8 writer version");
+        }
+        finally {
+            dropDeltaTableWithRetry("default." + tableName);
+        }
+    }
+
+    @Test(groups = {DELTA_LAKE_DATABRICKS, DELTA_LAKE_EXCLUDE_73, DELTA_LAKE_EXCLUDE_91, DELTA_LAKE_EXCLUDE_104, DELTA_LAKE_EXCLUDE_113, PROFILE_SPECIFIC_TESTS})
+    @Flaky(issue = DATABRICKS_COMMUNICATION_FAILURE_ISSUE, match = DATABRICKS_COMMUNICATION_FAILURE_MATCH)
+    public void testVacuumUnsupportedWriterFeature()
+    {
+        String tableName = "test_vacuum_unsupported_writer_feature_" + randomNameSuffix();
+        String directoryName = "databricks-compatibility-test-" + tableName;
+
+        onDelta().executeQuery("CREATE TABLE default." + tableName +
+                "(a INT)" +
+                "USING DELTA " +
+                "LOCATION '" + ("s3://" + bucketName + "/" + directoryName) + "'" +
+                "TBLPROPERTIES ('delta.minWriterVersion' = '7', 'delta.enableDeletionVectors' = true)");
+        try {
+            // TODO Improve error message
+            assertThatThrownBy(() -> onTrino().executeQuery("CALL delta.system.vacuum('default', '" + tableName + "', '7d')"))
+                    .hasMessageMatching(".* Table '.*' does not exist");
         }
         finally {
             dropDeltaTableWithRetry("default." + tableName);
