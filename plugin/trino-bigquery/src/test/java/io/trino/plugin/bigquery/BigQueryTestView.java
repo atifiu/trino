@@ -47,7 +47,7 @@ public class BigQueryTestView
     @Override
     public void close()
     {
-        sqlExecutor.execute("DROP TABLE " + table.getName());
+        table.close();
         sqlExecutor.execute("DROP VIEW " + viewName);
     }
 }
