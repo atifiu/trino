@@ -483,13 +483,6 @@ public abstract class BaseDeltaLakeConnectorSmokeTest
     }
 
     @Test
-    public void testDropColumnNotSupported()
-    {
-        registerTableFromResources("testdropcolumn", "io/trino/plugin/deltalake/testing/resources/databricks/nation", getQueryRunner());
-        assertQueryFails("ALTER TABLE testdropcolumn DROP COLUMN comment", "Cannot drop column from table using column mapping mode NONE");
-    }
-
-    @Test
     public void testCreatePartitionedTableAs()
     {
         String tableName = "test_create_partitioned_table_as_" + randomNameSuffix();
